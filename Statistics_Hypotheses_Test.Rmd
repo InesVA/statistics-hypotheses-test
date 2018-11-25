@@ -1,0 +1,132 @@
+---
+title: "Exam -- R part"
+author: "Stéphanie  Allassonnière,  Geneviève  Robin,  Elodie  Vernet  and  Zoltán  Szabó"
+date: "November 13 2018"
+output:
+  html_document:
+    df_print: paged
+header-includes: \usepackage{dsfont}
+---
+
+
+```{r setup, include=F}
+library(ggplot2)
+set.seed(123)
+```
+
+
+
+A cholesterol level above $240mg/dl$ of blood is a risk factor for heart disease. A lab has changed the flavour of a medicine used to diminish the cholesterol level. A study to test the effectiveness of the new version was conducted. Fifty people with cholesterol level between $240$ and $260$ were assigned at random to each of two treatments groups. Group A received the standard medicine and  group B received the new medicine. The observed cholesterol level after the treatment are
+
+  - for group A:  275, 255, 247, 206, 245, 196, 229, 218, 238, 224, 217, 205, 252, 194, 203, 192, 232, 239, 223, 239, 217, 241, 230, 216, 227,
+  
+  - for group B: 238, 216, 214, 247, 250, 223, 207, 254, 228, 219, 223, 247, 228, 207, 204, 225, 201, 253, 216, 223, 219, 224, 225, 228, 225.
+  
+ The cholesterol levels of group A and B are independent and i.i.d.\ Gaussian random variables distributed as $\mathcal{N}(m_A,\sigma_A)$ and $\mathcal{N}(m_B,\sigma_B)$ respectively.  
+ 
+We don't expect to see a difference between these two medicines. We assume that $\sigma:=\sigma_A=\sigma_B$ and we want to test $H_0: ~ m_A=m_B$ against $H_1: ~ m_A \neq m_B$.
+
+
+1. Create a dataframe which contains the data.
+
+```{r}
+group_A <- c(275, 255, 247, 206, 245, 196, 229, 218, 238, 224, 217, 205, 252, 194, 203, 192, 232, 239, 223, 239, 217, 241, 230, 216, 227)
+group_B <- c(238, 216, 214, 247, 250, 223, 207, 254, 228, 219, 223, 247, 228, 207, 204, 225, 201, 253, 216, 223, 219, 224, 225, 228, 225)
+AB <- cbind(group_A, group_B)
+dataframe_AB <- as.data.frame(AB)
+dataframe_AB
+```
+
+
+2. Check visually that the distribution of the cholesterol levels of group A and B can be modeled as Gaussian.
+
+```{r}
+ggplot(dataframe_AB) + aes(x = group_A) + xlim(150, 300) + geom_bar()
+ggplot(dataframe_AB) + aes(x = group_B) + xlim(150, 300) + geom_bar()
+
+# Visually, we can assume that they can be modeled as Gaussion in view of these histograms
+```
+
+3. Propose a test at level $\alpha$ for $H_0: ~ m_A=m_B$ against $H_0: ~ m_A \neq m_B$. Give the statistical model, the statistic that you use, its distribution under $H_0$, the test function and its p-value. Hint: You could look at PC8 as a source of inspiration.
+
+```{r}
+# We call xi the ith observation in group A and yi the ith observation in group B, for i <= 25. We assume that (x1,...x25) and (y1,...y25) are realizations of (X1,...X25) and (Y1,...Y25) where (X1,...X25) and (Y1...Y25) are two independent random vectors, Xi are iid N(m1, sigma^2) and Yi are iid N(m2, sigma^2). Then (X1,...X25,Y1...Y25) is a Gaussian vector with mean vector (m1,...m1, m2,...m2) and covariance matrix sigma^2*I where I is the identity matrix of size 50*50.
+
+# Therefore, the statistical model is (R^50, B(R^50), (N((m1,...m1,m2,...m2), sigma^2*I), m1 € R, m2 € R, sigma >0)).
+
+# I will use the test statistic T = sqrt(n)(1/n*sum(Xi) - 1/n*sum(Yi))/sqrt(2*sigma^2), that follows a T(48) under H0.
+
+# Under Ho, it should be near 0, and under H1, T in absolute value should become higher than a critical value c(alpha). The indicator function with parameter (p(abs(z) > c(alpha))) is the test function. 
+# c(alpha) = t(1-alpha/2) for for z a realization of our test function T.
+
+# The p-value is p(abs(T)>T_obs) = 2 * p(T > T_obs) = 2(1 - p(T <= T_obs)).
+```
+
+
+4. Write an R function  **test** with inputs $x=(x_1,\ldots, x_n)$, $y=(y_1,\ldots, y_n)$, $\alpha$ and output of a vector of size five containing the empirical mean of $x$, the empirical mean of $y$, the observed value of the statistics, the critical value of the rejection region, the observed value of the test function ($0$ or $1$) and the p-value.
+
+```{r}
+test <- function(x , y , alpha){
+  z <- c(0,0,0,0,0,0)
+  z[1] <- mean(x)
+  z[2] <- mean(y)
+  z[3] <- sqrt(25)* (mean(x) - mean(y)) / (sqrt(sd(x)^2 + sd(y)^2))
+  z[4] <- qt(1-alpha/2,df=48)
+  z[5] <- abs(z[3]) > z[4]
+  z[6] <- 2*(1-pt(z[3], df = 48))
+return(z)}
+```
+
+
+5. Check that significance level of your test through $I=1000$ simulations when $n=25$, $\alpha=0.05$, $m_A=m_B=220$ and $\sigma=20$.
+
+```{r eval = FALSE}
+mA <- 220
+mB <- 220
+alpha <- 0.05
+n <- 25
+sigma <- 20
+df <- 2 * (n-1)
+
+samples_A <- lapply(1:1e3, function(i) rnorm(n, mA, sigma))
+samples_B <- lapply(1:1e3, function(i) rnorm(n, mB, sigma))
+tests <- mapply(test,samples_A,samples_B, alpha)
+test_functions <- tests[5,]
+sum(test_functions)/1e3
+```
+
+
+6. Approximate the probability that your test appropriately rejects $H_0$ when $n=25$, $\alpha=0.05$, $m_A=220$, $m_B=230$ and $\sigma=20$ using the Monte-Carlo method (using $I=1000$ simulations).
+
+```{r}
+mA <- 220
+mB <- 230
+alpha <- 0.05
+n <- 25
+sigma <- 20
+df <- 2 * (n-1)
+
+samples_A <- lapply(1:1e3, function(i) rnorm(n, mA, sigma))
+samples_B <- lapply(1:1e3, function(i) rnorm(n, mB, sigma))
+tests <- mapply(test,samples_A,samples_B, alpha)
+test_functions <- tests[5,]
+sum(test_functions)/1e3
+
+# Here H0 is false so our test should reject it (mA is different from mB). However, our test only rejects it (appropriately) in about 40% of the cases. This might be because 220 and 230 are not so far.
+
+```
+
+
+7. Apply your test to the cholesterol data.
+
+```{r}
+test(group_A, group_B, 0.05)
+
+# The empirical mean of sample_A is 226.4.
+# The empirical mean of sample_B is 225.76.
+# The observed value or our test statistic is 0.1250878.
+# The critical value of our rejection region is 2.0106348. 
+# Our test function takes 0 as value, which means we do not reject H0 in this case.
+# The P-value of our test is 0.9009764, which is very big : there is very little suspicion against H0.
+```
+
